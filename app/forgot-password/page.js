@@ -1,36 +1,31 @@
+"use client";
+
+import Link from "next/link";
+import { Mail, Phone } from "lucide-react";
+import AuthShell from "../../components/AuthShell";
+import { useStore } from "../../context/StoreContext";
+
+// Password reset by email needs an email provider; until one is set up, customers contact the store.
 export default function ForgotPasswordPage() {
+  const { settings } = useStore();
   return (
-    <main className="min-h-screen bg-darkBg flex items-center justify-center px-6">
-      <div className="w-full max-w-md bg-darkCard rounded-lg shadow-lg p-8">
-        <h1 className="text-2xl font-bold text-center text-accent mb-6">
-          Reset Password
-        </h1>
-
-        <form className="space-y-4">
-          <div>
-            <label className="block text-sm mb-2">Email</label>
-            <input
-              type="email"
-              placeholder="Enter your registered email"
-              className="w-full px-4 py-2 rounded-lg bg-darkBg border border-line text-lightText placeholder-mutedText focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          <button
-            type="button"
-            className="w-full py-3 rounded-lg bg-accent text-white font-semibold hover:bg-accentDark transition"
-          >
-            Send Reset Link
-          </button>
-        </form>
-
-        <p className="text-center text-mutedText mt-6">
-          Remembered your password?{" "}
-          <a href="/login" className="text-accent hover:underline">
-            Back to Login
+    <AuthShell title="Forgot your password?" subtitle="Get in touch and we'll reset it for you.">
+      <div className="space-y-3 rounded-2xl border border-line bg-surface p-6">
+        {settings.storeEmail && (
+          <a href={`mailto:${settings.storeEmail}?subject=Password%20reset`} className="flex items-center gap-3 font-medium text-ink hover:text-brand">
+            <Mail className="h-5 w-5 text-brand" /> {settings.storeEmail}
           </a>
-        </p>
+        )}
+        {settings.storePhone && (
+          <a href={`tel:${settings.storePhone}`} className="flex items-center gap-3 font-medium text-ink hover:text-brand">
+            <Phone className="h-5 w-5 text-brand" /> {settings.storePhone}
+          </a>
+        )}
+        <p className="pt-2 text-sm">Send us the email address on your account and we&apos;ll set a temporary password.</p>
       </div>
-    </main>
+      <p className="mt-6 text-center text-sm">
+        Remembered it? <Link href="/login" className="font-semibold text-brand hover:underline">Back to sign in</Link>
+      </p>
+    </AuthShell>
   );
 }

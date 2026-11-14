@@ -1,174 +1,179 @@
-// app/search/page.js
 "use client";
 
-import { products, getCategory } from "../../lib/product";
-import ProductCard from "../../components/ProductCard";
+import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, Suspense } from "react";
+import { SlidersHorizontal, X } from "lucide-react";
+import ProductCard from "../../components/ProductCard";
+import { useStore } from "../../context/StoreContext";
+
+const SORTS = {
+  relevance: "Recommended",
+  "price-asc": "Price: low to high",
+  "price-desc": "Price: high to low",
+  popular: "Best selling",
+  name: "Name A–Z",
+};
 
 function SearchContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const params = useSearchParams();
+  const { products, categories, getCategory } = useStore();
+  const [showFilters, setShowFilters] = useState(false);
 
-  // --- Get query params ---
-  const q = searchParams.get("q") || "";
-  const categoryParams = searchParams.getAll("category");
-  const minPrice = parseFloat(searchParams.get("minPrice") || "0");
-  const maxPrice = parseFloat(searchParams.get("maxPrice") || "1000");
-  const minRating = parseFloat(searchParams.get("minRating") || "0");
-  const inStock = searchParams.get("inStock") === "true";
+  const q = params.get("q") || "";
+  const selected = params.getAll("category");
+  const inStock = params.get("inStock") === "1";
+  const sort = params.get("sort") || "relevance";
+  const min = params.get("min") || "";
+  const max = params.get("max") || "";
 
-  // --- Categories available ---
-  const categories = Array.from(new Set(products.map((p) => p.category)));
-
-  // --- Controlled state for filters ---
-  const [selectedCategories, setSelectedCategories] = useState(categoryParams);
-  const [price, setPrice] = useState([minPrice, maxPrice]);
-  const [rating, setRating] = useState(minRating);
-  const [stockOnly, setStockOnly] = useState(inStock);
-
-  // --- Handle filter apply ---
-  const applyFilters = () => {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    selectedCategories.forEach((c) => params.append("category", c));
-    if (price[0] > 0) params.set("minPrice", price[0]);
-    if (price[1] < 1000) params.set("maxPrice", price[1]);
-    if (rating > 0) params.set("minRating", rating);
-    if (stockOnly) params.set("inStock", "true");
-    router.push(`/search?${params.toString()}`);
+  // Every filter change updates the URL, so results are shareable and survive refresh.
+  const update = (changes) => {
+    const next = new URLSearchParams(params.toString());
+    for (const [k, v] of Object.entries(changes)) {
+      next.delete(k);
+      [].concat(v).filter((x) => x !== "" && x != null && x !== false).forEach((x) => next.append(k, x));
+    }
+    router.replace(`/search?${next.toString()}`, { scroll: false });
   };
 
-  // --- Filter products ---
-  let results = products.filter((p) => {
-    const textMatch =
-      !q ||
-      p.name.toLowerCase().includes(q.toLowerCase()) ||
-      (p.desc && p.desc.toLowerCase().includes(q.toLowerCase()));
+  const results = useMemo(() => {
+    const term = q.toLowerCase().trim();
+    let r = products.filter(
+      (p) =>
+        (!term || [p.name, p.sku, p.desc, p.categoryName].some((s) => s?.toLowerCase().includes(term))) &&
+        (selected.length === 0 || selected.includes(p.category)) &&
+        (!inStock || p.stock > 0) &&
+        (min === "" || p.price >= Number(min)) &&
+        (max === "" || p.price <= Number(max))
+    );
+    const by = {
+      "price-asc": (a, b) => a.price - b.price,
+      "price-desc": (a, b) => b.price - a.price,
+      popular: (a, b) => b.sold - a.sold,
+      name: (a, b) => a.name.localeCompare(b.name),
+    }[sort];
+    return by ? [...r].sort(by) : r;
+  }, [products, q, selected.join(), inStock, min, max, sort]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const catMatch =
-  selectedCategories.length === 0 ||
-  selectedCategories.some((c) => c.toLowerCase() === p.category.toLowerCase());
+  const title = q ? `Results for “${q}”` : selected.length === 1 ? getCategory(selected[0])?.name : "All products";
+  const activeCount = selected.length + (inStock ? 1 : 0) + (min || max ? 1 : 0);
 
+  const filters = (
+    <div className="space-y-7">
+      <div>
+        <h3 className="mb-3 text-sm">Category</h3>
+        <div className="space-y-1">
+          {categories.map((c) => (
+            <label key={c.slug} className="flex cursor-pointer items-center justify-between rounded-lg px-2 py-1.5 text-sm hover:bg-surface2">
+              <span className="flex items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-[#0E6B52]"
+                  checked={selected.includes(c.slug)}
+                  onChange={(e) => update({ category: e.target.checked ? [...selected, c.slug] : selected.filter((s) => s !== c.slug) })}
+                />
+                {c.name}
+              </span>
+              <span className="text-xs text-muted">{c.count}</span>
+            </label>
+          ))}
+        </div>
+      </div>
 
-    const priceMatch = p.price >= price[0] && p.price <= price[1];
-    const ratingMatch = p.rating >= rating;
-    const stockMatch = !stockOnly || Math.random() > 0.2; // fake 80% in-stock
+      <div>
+        <h3 className="mb-3 text-sm">Price</h3>
+        <div className="flex items-center gap-2">
+          <PriceInput placeholder="Min" defaultValue={min} onCommit={(v) => update({ min: v })} />
+          <span className="text-muted">–</span>
+          <PriceInput placeholder="Max" defaultValue={max} onCommit={(v) => update({ max: v })} />
+        </div>
+      </div>
 
-    return textMatch && catMatch && priceMatch && ratingMatch && stockMatch;
-  });
+      <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+        <input type="checkbox" className="h-4 w-4 accent-[#0E6B52]" checked={inStock} onChange={(e) => update({ inStock: e.target.checked ? "1" : "" })} />
+        In stock only
+      </label>
+
+      {activeCount > 0 && (
+        <button onClick={() => update({ category: [], inStock: "", min: "", max: "" })} className="text-sm font-semibold text-brand hover:underline">
+          Clear filters
+        </button>
+      )}
+    </div>
+  );
 
   return (
-    <main className="min-h-screen bg-darkBg text-lightText px-6 py-12">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
-        {/* --- Sidebar Filters --- */}
-        <aside className="md:col-span-1 bg-darkCard p-6 rounded-lg space-y-6">
-          <h2 className="text-lg font-semibold mb-2">Filters</h2>
+    <main className="container-x py-10">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl md:text-4xl">{title}</h1>
+          <p className="mt-1 text-sm">{results.length} product{results.length === 1 ? "" : "s"}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowFilters(true)} className="btn-ghost px-4 py-2 text-sm lg:hidden">
+            <SlidersHorizontal className="h-4 w-4" /> Filters{activeCount ? ` (${activeCount})` : ""}
+          </button>
+          <select
+            value={sort}
+            onChange={(e) => update({ sort: e.target.value === "relevance" ? "" : e.target.value })}
+            className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium focus:border-brand focus:outline-none"
+            aria-label="Sort products"
+          >
+            {Object.entries(SORTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+      </div>
 
-          {/* Categories */}
-          <div>
-            <h3 className="text-sm font-medium mb-2">Categories</h3>
-            {categories.map((c) => (
-  <label key={c} className="block text-sm">
-    <input
-      type="checkbox"
-      className="mr-2"
-      checked={selectedCategories.includes(c)}
-      onChange={(e) => {
-        if (e.target.checked) {
-          setSelectedCategories([...selectedCategories, c]);
-        } else {
-          setSelectedCategories(selectedCategories.filter((cat) => cat !== c));
-        }
-      }}
-    />
-    {getCategory(c)?.name || c}
-  </label>
-))}
+      <div className="mt-8 grid gap-8 lg:grid-cols-[240px_1fr]">
+        <aside className="hidden h-fit rounded-2xl border border-line bg-surface p-5 lg:sticky lg:top-36 lg:block">{filters}</aside>
 
-          </div>
-
-          {/* Price Range */}
-          <div>
-            <h3 className="text-sm font-medium mb-2">Price Range ($)</h3>
-            <div className="flex gap-2 items-center">
-              <input
-                type="number"
-                value={price[0]}
-                min="0"
-                max={price[1]}
-                onChange={(e) => setPrice([+e.target.value, price[1]])}
-                className="w-20 bg-darkBg border border-line rounded px-2 py-1 text-sm"
-              />
-              <span>-</span>
-              <input
-                type="number"
-                value={price[1]}
-                min={price[0]}
-                max="1000"
-                onChange={(e) => setPrice([price[0], +e.target.value])}
-                className="w-20 bg-darkBg border border-line rounded px-2 py-1 text-sm"
-              />
+        {showFilters && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <div className="absolute inset-0 bg-ink/40" onClick={() => setShowFilters(false)} />
+            <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-3xl bg-surface p-6">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-xl">Filters</h2>
+                <button onClick={() => setShowFilters(false)} aria-label="Close filters" className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface2">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              {filters}
+              <button onClick={() => setShowFilters(false)} className="btn-primary mt-8 w-full">Show {results.length} products</button>
             </div>
           </div>
+        )}
 
-          {/* Rating */}
-          <div>
-            <h3 className="text-sm font-medium mb-2">Minimum Rating</h3>
-            {[0, 3, 4].map((r) => (
-              <label key={r} className="block text-sm">
-                <input
-                  type="radio"
-                  name="rating"
-                  value={r}
-                  className="mr-2"
-                  checked={rating === r}
-                  onChange={() => setRating(r)}
-                />
-                {r === 0 ? "Any" : `${r}★ & up`}
-              </label>
-            ))}
-          </div>
-
-          {/* Availability */}
-          <div>
-            <label className="flex items-center text-sm">
-              <input
-                type="checkbox"
-                className="mr-2"
-                checked={stockOnly}
-                onChange={() => setStockOnly(!stockOnly)}
-              />
-              In Stock Only
-            </label>
-          </div>
-
-          {/* Apply Filters */}
-          <button
-            onClick={applyFilters}
-            className="w-full bg-accent text-white py-2 rounded mt-4 hover:bg-accentDark transition"
-          >
-            Apply Filters
-          </button>
-        </aside>
-
-        {/* --- Results --- */}
-        <section className="md:col-span-3">
-          <h1 className="text-2xl font-bold mb-6">
-            Results {q ? `for “${q}”` : ""}
-          </h1>
+        <section>
           {results.length === 0 ? (
-            <div className="bg-darkCard p-6 rounded-lg">No results found.</div>
+            <div className="rounded-2xl border border-line bg-surface p-12 text-center">
+              <h2 className="text-xl">No products found</h2>
+              <p className="mt-2 text-sm">Try a different search or clear the filters.</p>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {results.map((p) => (
-                <ProductCard product={p} key={`res-${p.id}`} />
-              ))}
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+              {results.map((p) => <ProductCard key={p.id} product={p} />)}
             </div>
           )}
         </section>
       </div>
     </main>
+  );
+}
+
+function PriceInput({ defaultValue, onCommit, placeholder }) {
+  return (
+    <input
+      key={defaultValue}
+      type="number"
+      min="0"
+      inputMode="decimal"
+      placeholder={placeholder}
+      defaultValue={defaultValue}
+      onBlur={(e) => e.target.value !== defaultValue && onCommit(e.target.value)}
+      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+      className="w-full rounded-lg border border-line bg-page px-3 py-2 text-sm focus:border-brand focus:outline-none"
+    />
   );
 }
 

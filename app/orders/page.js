@@ -1,64 +1,56 @@
-"use client";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { Package, ChevronRight } from "lucide-react";
+import { db } from "../../lib/db";
+import { currentUser } from "../../lib/auth";
+import { formatPrice, formatDate } from "../../lib/format";
+import { StatusBadge } from "../../components/OrderBits";
 
-export default function OrdersPage() {
-  const orders = [
-    {
-      id: "ORD123",
-      date: "2025-09-15",
-      status: "Delivered",
-      total: 199,
-    },
-    {
-      id: "ORD124",
-      date: "2025-09-20",
-      status: "Shipped",
-      total: 129,
-    },
-    {
-      id: "ORD125",
-      date: "2025-09-25",
-      status: "Processing",
-      total: 89,
-    },
-  ];
+export const dynamic = "force-dynamic";
+export const metadata = { title: "My orders · Mustawa" };
+
+export default async function OrdersPage() {
+  const user = await currentUser();
+  if (!user) redirect("/login?next=/orders");
+
+  const orders = await db.order.findMany({
+    where: { userId: user.id },
+    include: { items: true },
+    orderBy: { createdAt: "desc" },
+  });
 
   return (
-    <main className="min-h-screen bg-darkBg text-lightText px-6 py-12">
-      <h1 className="text-2xl font-bold mb-6">My Orders</h1>
+    <main className="container-x py-10">
+      <h1 className="text-3xl md:text-4xl">My orders</h1>
 
-      <div className="space-y-4">
-        {orders.map((order) => (
-          <div
-            key={order.id}
-            className="bg-darkCard p-6 rounded-lg shadow flex justify-between items-center"
-          >
-            <div>
-              <p className="font-semibold">Order #{order.id}</p>
-              <p className="text-mutedText text-sm">{order.date}</p>
-              <p className="text-sm">
-                Status:{" "}
-                <span
-                  className={
-                    order.status === "Delivered"
-                      ? "text-green-400"
-                      : order.status === "Shipped"
-                      ? "text-blue-400"
-                      : "text-yellow-400"
-                  }
-                >
-                  {order.status}
-                </span>
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="font-bold">${order.total}</p>
-              <button href={`/orders/${order.id}`} className="mt-2 text-accent hover:underline text-sm">
-                View Details
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+      {orders.length === 0 ? (
+        <div className="mt-8 rounded-2xl border border-line bg-surface p-12 text-center">
+          <Package className="mx-auto h-10 w-10 text-muted" />
+          <h2 className="mt-4 text-xl">No orders yet</h2>
+          <p className="mt-1 text-sm">When you place an order it will show up here.</p>
+          <Link href="/search" className="btn-primary mt-6">Start shopping</Link>
+        </div>
+      ) : (
+        <ul className="mt-8 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+          {orders.map((o) => (
+            <li key={o.id}>
+              <Link href={`/orders/${o.number}`} className="flex items-center gap-4 p-5 hover:bg-page">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="font-semibold">{o.number}</span>
+                    <StatusBadge status={o.status} />
+                  </div>
+                  <div className="mt-1 text-sm text-muted">
+                    {formatDate(o.createdAt)} · {o.items.reduce((n, i) => n + i.qty, 0)} items
+                  </div>
+                </div>
+                <span className="font-display text-lg font-extrabold">{formatPrice(o.total)}</span>
+                <ChevronRight className="h-5 w-5 text-muted" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </main>
   );
 }

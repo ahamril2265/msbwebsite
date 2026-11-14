@@ -1,67 +1,49 @@
-export default function SignUpPage() {
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import AuthShell from "../../components/AuthShell";
+import { Field, FormError, sendJSON, formValues } from "../../components/Form";
+import { useStore } from "../../context/StoreContext";
+
+export default function SignupPage() {
+  const router = useRouter();
+  const { setUser } = useStore();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const v = formValues(e.currentTarget);
+    if (v.password !== v.confirm) return setError("Passwords don't match.");
+    setBusy(true);
+    setError("");
+    const { data, error } = await sendJSON("/api/auth/signup", v);
+    setBusy(false);
+    if (error) return setError(error);
+    setUser(data.user);
+    router.push("/");
+    router.refresh();
+  };
+
   return (
-    <main className="min-h-screen bg-darkBg flex items-center justify-center px-6">
-      <div className="w-full max-w-md bg-darkCard rounded-lg shadow-lg p-8">
-        <h1 className="text-2xl font-bold text-center text-accent mb-6">Sign Up</h1>
-
-        <form className="space-y-4">
-          {/* Name */}
-          <div>
-            <label className="block text-sm mb-2">Name</label>
-            <input
-              type="text"
-              placeholder="Enter your name"
-              className="w-full px-4 py-2 rounded-lg bg-darkBg border border-line text-lightText placeholder-mutedText focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          {/* Email */}
-          <div>
-            <label className="block text-sm mb-2">Email</label>
-            <input
-              type="email"
-              placeholder="Enter your email"
-              className="w-full px-4 py-2 rounded-lg bg-darkBg border border-line text-lightText placeholder-mutedText focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          {/* Password */}
-          <div>
-            <label className="block text-sm mb-2">Password</label>
-            <input
-              type="password"
-              placeholder="Create a password"
-              className="w-full px-4 py-2 rounded-lg bg-darkBg border border-line text-lightText placeholder-mutedText focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          {/* Confirm Password */}
-          <div>
-            <label className="block text-sm mb-2">Confirm Password</label>
-            <input
-              type="password"
-              placeholder="Re-enter your password"
-              className="w-full px-4 py-2 rounded-lg bg-darkBg border border-line text-lightText placeholder-mutedText focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          {/* Submit */}
-          <button
-            type="button"
-            className="w-full py-3 rounded-lg bg-accent text-white font-semibold hover:bg-accentDark transition"
-          >
-            Sign Up
-          </button>
-        </form>
-
-        {/* Links */}
-        <p className="text-center text-mutedText mt-6">
-          Already have an account?{" "}
-          <a href="/login" className="text-accent hover:underline">
-            Login
-          </a>
-        </p>
-      </div>
-    </main>
+    <AuthShell title="Create your account" subtitle="Save your details, track orders and reorder in a few clicks.">
+      <form onSubmit={submit} className="space-y-4">
+        <FormError>{error}</FormError>
+        <Field label="Full name" name="name" autoComplete="name" required />
+        <Field label="Email" name="email" type="email" autoComplete="email" required />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Phone (optional)" name="phone" type="tel" autoComplete="tel" />
+          <Field label="Business (optional)" name="company" autoComplete="organization" />
+        </div>
+        <Field label="Password" name="password" type="password" autoComplete="new-password" minLength={8} required hint="At least 8 characters." />
+        <Field label="Confirm password" name="confirm" type="password" autoComplete="new-password" required />
+        <button disabled={busy} className="btn-primary w-full disabled:opacity-60">{busy ? "Creating account…" : "Create account"}</button>
+      </form>
+      <p className="mt-6 text-center text-sm">
+        Already have an account? <Link href="/login" className="font-semibold text-brand hover:underline">Sign in</Link>
+      </p>
+    </AuthShell>
   );
 }

@@ -3,12 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Lock } from "lucide-react";
-import { useCart, shippingFor, FREE_SHIPPING_OVER } from "../../context/CartContext";
-import { formatPrice } from "../../lib/product";
+import { useCart } from "../../context/CartContext";
+import { useStore } from "../../context/StoreContext";
+import { formatPrice } from "../../lib/format";
 
 export default function CartPage() {
-  const { items, loaded, count, subtotal, setQty, removeFromCart } = useCart();
-  const shipping = shippingFor(subtotal);
+  const { items, loaded, count, subtotal, shipping, setQty, removeFromCart } = useCart();
+  const FREE_SHIPPING_OVER = useStore().settings.freeShippingOver;
   const total = subtotal + shipping;
   const toFree = Math.max(0, FREE_SHIPPING_OVER - subtotal);
 
@@ -73,7 +74,7 @@ export default function CartPage() {
                     <div className="flex items-center rounded-full border border-line">
                       <button onClick={() => setQty(p.id, qty - 1)} aria-label="Decrease quantity" className="grid h-9 w-9 place-items-center hover:text-brand"><Minus className="h-3.5 w-3.5" /></button>
                       <span className="w-8 text-center text-sm font-semibold">{qty}</span>
-                      <button onClick={() => setQty(p.id, qty + 1)} aria-label="Increase quantity" className="grid h-9 w-9 place-items-center hover:text-brand"><Plus className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => setQty(p.id, Math.min(p.stock, qty + 1))} aria-label="Increase quantity" className="grid h-9 w-9 place-items-center hover:text-brand"><Plus className="h-3.5 w-3.5" /></button>
                     </div>
                     <span className="font-display text-lg font-extrabold">{formatPrice(p.price * qty)}</span>
                   </div>
@@ -105,7 +106,7 @@ export default function CartPage() {
             <Lock className="h-3.5 w-3.5" /> Secure checkout
           </p>
           <div className="mt-5 rounded-xl bg-brandSoft p-4 text-xs text-brandDark">
-            Ordering by the carton? <Link href="/signup" className="font-semibold underline">Ask for a bulk quote</Link>.
+            Ordering by the carton? <Link href="/quote" className="font-semibold underline">Ask for a bulk quote</Link>.
           </div>
         </aside>
       </div>

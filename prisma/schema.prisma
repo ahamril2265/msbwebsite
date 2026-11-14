@@ -1,0 +1,104 @@
+// Database schema for the Mustawa store.
+// Local dev uses SQLite (prisma/dev.db). To go live on Postgres, change
+// provider to "postgresql" and point DATABASE_URL at your database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  name         String
+  phone        String?
+  company      String?
+  passwordHash String
+  role         String   @default("customer") // "customer" | "admin"
+  createdAt    DateTime @default(now())
+  orders       Order[]
+}
+
+model Category {
+  slug     String    @id
+  name     String
+  tagline  String    @default("")
+  desc     String    @default("")
+  image    String    @default("")
+  sort     Int       @default(0)
+  products Product[]
+}
+
+model Product {
+  id           Int      @id @default(autoincrement())
+  sku          String   @unique
+  name         String
+  size         String?
+  desc         String   @default("")
+  price        Float
+  stock        Int      @default(100)
+  img          String
+  featured     Boolean  @default(false)
+  active       Boolean  @default(true)
+  categorySlug String
+  category     Category @relation(fields: [categorySlug], references: [slug])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Order {
+  id        Int         @id @default(autoincrement())
+  number    String      @unique
+  status    String      @default("pending") // pending | confirmed | shipped | delivered | cancelled
+  payment   String // bank | cod
+  paid      Boolean     @default(false)
+  name      String
+  email     String
+  phone     String
+  company   String?
+  street    String
+  city      String
+  postal    String
+  country   String
+  notes     String?
+  subtotal  Float
+  shipping  Float
+  total     Float
+  userId    Int?
+  user      User?       @relation(fields: [userId], references: [id])
+  items     OrderItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        Int    @id @default(autoincrement())
+  orderId   Int
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId Int
+  sku       String
+  name      String
+  img       String
+  price     Float
+  qty       Int
+}
+
+model QuoteRequest {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String
+  phone     String?
+  company   String?
+  message   String
+  status    String   @default("new") // new | contacted | closed
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  key   String @id
+  value String
+}

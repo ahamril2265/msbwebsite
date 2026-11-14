@@ -1,8 +1,13 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Mail, Phone, MapPin } from "lucide-react";
-import { categories } from "../lib/product";
+import { useStore } from "../context/StoreContext";
 
 export default function Footer() {
+  const { categories, settings } = useStore();
+  if (usePathname().startsWith("/admin")) return null;
   return (
     <footer className="mt-16 bg-ink text-white/70">
       <div className="container-x grid gap-10 py-14 md:grid-cols-4">
@@ -25,13 +30,14 @@ export default function Footer() {
         <FooterCol title="Account">
           <li><Link href="/login" className="hover:text-white">Login</Link></li>
           <li><Link href="/signup" className="hover:text-white">Create account</Link></li>
+          <li><Link href="/quote" className="hover:text-white">Bulk quote</Link></li>
           <li><Link href="/orders" className="hover:text-white">My orders</Link></li>
           <li><Link href="/wishlist" className="hover:text-white">Wishlist</Link></li>
         </FooterCol>
 
         <FooterCol title="Contact">
-          <li className="flex items-center gap-2"><Mail className="h-4 w-4" /> support@mustawa.com</li>
-          <li className="flex items-center gap-2"><Phone className="h-4 w-4" /> +123 456 7890</li>
+          <li className="flex items-center gap-2"><Mail className="h-4 w-4" /> {settings.storeEmail}</li>
+          <li className="flex items-center gap-2"><Phone className="h-4 w-4" /> {settings.storePhone}</li>
           <li className="flex items-center gap-2"><MapPin className="h-4 w-4" /> Bulk & wholesale orders welcome</li>
         </FooterCol>
       </div>

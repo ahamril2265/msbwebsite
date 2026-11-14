@@ -1,57 +1,51 @@
-export default function LoginPage() {
+"use client";
+
+import Link from "next/link";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import AuthShell from "../../components/AuthShell";
+import { Field, FormError, sendJSON, formValues } from "../../components/Form";
+import { useStore } from "../../context/StoreContext";
+
+function LoginForm() {
+  const router = useRouter();
+  const next = useSearchParams().get("next");
+  const { setUser } = useStore();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    const { data, error } = await sendJSON("/api/auth/login", formValues(e.currentTarget));
+    setBusy(false);
+    if (error) return setError(error);
+    setUser(data.user);
+    // Only follow same-site paths.
+    const dest = next?.startsWith("/") && !next.startsWith("//") ? next : data.user.role === "admin" ? "/admin" : "/";
+    router.push(dest);
+    router.refresh();
+  };
+
   return (
-    <main className="min-h-screen bg-darkBg flex items-center justify-center px-6">
-      <div className="w-full max-w-md bg-darkCard rounded-lg shadow-lg p-8">
-        <h1 className="text-2xl font-bold text-center text-accent mb-6">Login</h1>
-
-        <form className="space-y-4">
-          {/* Email */}
-          <div>
-            <label className="block text-sm mb-2">Email</label>
-            <input
-              type="email"
-              placeholder="Enter your email"
-              className="w-full px-4 py-2 rounded-lg bg-darkBg border border-line text-lightText placeholder-mutedText focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          {/* Password */}
-          <div>
-            <label className="block text-sm mb-2">Password</label>
-            <input
-              type="password"
-              placeholder="Enter your password"
-              className="w-full px-4 py-2 rounded-lg bg-darkBg border border-line text-lightText placeholder-mutedText focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          {/* Forgot Password */}
-          <div className="flex justify-end">
-            <a
-              href="/forgot-password"
-              className="text-sm text-accent hover:underline"
-            >
-              Forgot Password?
-            </a>
-          </div>
-
-          {/* Submit */}
-          <button
-            type="button"
-            className="w-full py-3 rounded-lg bg-accent text-white font-semibold hover:bg-accentDark transition"
-          >
-            Login
-          </button>
-        </form>
-
-        {/* Links */}
-        <p className="text-center text-mutedText mt-6">
-          Don’t have an account?{" "}
-          <a href="/signup" className="text-accent hover:underline">
-            Sign Up
-          </a>
-        </p>
-      </div>
-    </main>
+    <AuthShell title="Welcome back" subtitle="Sign in to see your orders and check out faster.">
+      <form onSubmit={submit} className="space-y-4">
+        <FormError>{error}</FormError>
+        <Field label="Email" name="email" type="email" autoComplete="email" required />
+        <Field label="Password" name="password" type="password" autoComplete="current-password" required />
+        <div className="flex justify-end">
+          <Link href="/forgot-password" className="text-sm font-medium text-brand hover:underline">Forgot password?</Link>
+        </div>
+        <button disabled={busy} className="btn-primary w-full disabled:opacity-60">{busy ? "Signing in…" : "Sign in"}</button>
+      </form>
+      <p className="mt-6 text-center text-sm">
+        New to Mustawa? <Link href="/signup" className="font-semibold text-brand hover:underline">Create an account</Link>
+      </p>
+    </AuthShell>
   );
+}
+
+export default function LoginPage() {
+  return <Suspense><LoginForm /></Suspense>;
 }

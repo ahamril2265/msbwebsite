@@ -5,19 +5,20 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight, Truck, BadgeCheck, Boxes, Recycle } from "lucide-react";
 import Carousel from "../components/Carousel";
-import { products, categories, categoryImage } from "../lib/product";
+import { useStore } from "../context/StoreContext";
 import { recommendForUser } from "../lib/recommend";
 import { useRecentlyViewed } from "../context/RecentlyViewedContext";
 
-const byCat = (slug) => products.filter((p) => p.category === slug);
 const img = (folder, file) => encodeURI(`/Products/${folder}/${file}`);
 
 export default function Home() {
+  const { products, categories } = useStore();
+  const byCat = (slug) => products.filter((p) => p.category === slug);
   const { recentlyViewed } = useRecentlyViewed();
   const [userRecs, setUserRecs] = useState([]);
-  useEffect(() => setUserRecs(recommendForUser(10)), []);
+  useEffect(() => setUserRecs(recommendForUser(products, 10)), [products]);
 
-  const bestSellers = products.filter((p) => p.featured).concat(products.filter((_, i) => i % 5 === 1)).slice(0, 10);
+  const bestSellers = [...products].sort((a, b) => b.sold - a.sold || b.featured - a.featured).slice(0, 10);
 
   return (
     <main>
@@ -40,7 +41,7 @@ export default function Home() {
             </div>
             <dl className="mt-10 flex gap-8">
               {[
-                [products.length + "+", "SKUs in stock"],
+                [products.length, "Products"],
                 [categories.length, "Product lines"],
                 ["Bulk", "Pricing tiers"],
               ].map(([n, l]) => (
@@ -112,9 +113,9 @@ export default function Home() {
                   </span>
                 </div>
                 <div className={`relative mt-4 ${i < 2 ? "h-48 md:h-56" : "h-36 md:h-44"}`}>
-                  <Image src={categoryImage(c)} alt={c.name} fill sizes="(max-width:768px) 50vw, 33vw" className="object-contain transition duration-500 group-hover:scale-105" />
+                  <Image src={c.image} alt={c.name} fill sizes="(max-width:768px) 50vw, 33vw" className="object-contain transition duration-500 group-hover:scale-105" />
                 </div>
-                <span className="mt-3 text-xs font-semibold text-muted">{c.skus.length} products</span>
+                <span className="mt-3 text-xs font-semibold text-muted">{c.count} products</span>
               </Link>
             ))}
           </div>
@@ -122,7 +123,7 @@ export default function Home() {
 
         {recentlyViewed.length > 0 && <Carousel title="Recently viewed" products={recentlyViewed} />}
 
-        <Carousel title="Best sellers" subtitle="Our most-ordered packaging this month" href="/search" products={bestSellers} />
+        <Carousel title="Best sellers" subtitle="Our most-ordered packaging" href="/search" products={bestSellers} />
 
         {/* ─── Bulk banner ─── */}
         <section className="my-10 overflow-hidden rounded-3xl bg-brand text-white">
@@ -133,7 +134,7 @@ export default function Home() {
               <p className="mt-3 max-w-md text-white/80">
                 Get tiered wholesale pricing on carry bags, garbage bags and PP containers. Tell us what you need and we&apos;ll quote within a day.
               </p>
-              <Link href="/signup" className="mt-6 inline-flex items-center gap-2 rounded-full bg-amber px-6 py-3 font-semibold text-ink hover:brightness-95">
+              <Link href="/quote" className="mt-6 inline-flex items-center gap-2 rounded-full bg-amber px-6 py-3 font-semibold text-ink hover:brightness-95">
                 Request a bulk quote <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
@@ -144,7 +145,7 @@ export default function Home() {
           </div>
         </section>
 
-        {categories.filter((c) => c.skus.length > 1).map((c) => (
+        {categories.filter((c) => c.count > 1).map((c) => (
           <Carousel key={c.slug} title={c.name} subtitle={c.tagline} href={`/search?category=${c.slug}`} products={byCat(c.slug)} />
         ))}
 

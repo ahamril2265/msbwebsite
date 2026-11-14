@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import { products as allProducts } from "../lib/product"; // client can import this plain JS file
+import { useStore } from "../context/StoreContext";
+import { formatPrice } from "../lib/format";
 
 export default function SearchBar({ initial = "" }) {
   const router = useRouter();
+  const { products: allProducts } = useStore();
   const [query, setQuery] = useState(initial || "");
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
@@ -28,7 +30,7 @@ export default function SearchBar({ initial = "" }) {
       .slice(0, 6);
     setSuggestions(hits);
     setOpen(hits.length > 0);
-  }, [query]);
+  }, [query, allProducts]);
 
   // click outside to close
   useEffect(() => {
@@ -75,7 +77,7 @@ export default function SearchBar({ initial = "" }) {
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium">{s.name}</div>
-                    <div className="text-xs text-mutedText">${s.price} • {s.categoryName}</div>
+                    <div className="text-xs text-mutedText">{formatPrice(s.price)} • {s.categoryName}</div>
                   </div>
                 </a>
               </li>

@@ -4,8 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ChevronRight, Heart, Minus, Plus, ShoppingBag, Star, Truck, ShieldCheck, Boxes, Check } from "lucide-react";
-import { products, formatPrice, getCategory } from "../../../lib/product";
+import { ChevronRight, Heart, Minus, Plus, ShoppingBag, Truck, ShieldCheck, Boxes, Check } from "lucide-react";
+import { formatPrice } from "../../../lib/format";
+import { useStore } from "../../../context/StoreContext";
 import { recommendByCategory } from "../../../lib/recommend";
 import ProductCard from "../../../components/ProductCard";
 import { useRecentlyViewed } from "../../../context/RecentlyViewedContext";
@@ -16,6 +17,7 @@ export default function ProductPage() {
   const { id } = useParams();
   const router = useRouter();
   const productId = parseInt(id, 10);
+  const { products, getCategory } = useStore();
   const product = products.find((p) => p.id === productId);
 
   const { addRecentlyViewed } = useRecentlyViewed();
@@ -42,7 +44,7 @@ export default function ProductPage() {
 
   const category = getCategory(product.category);
   const siblings = products.filter((p) => p.category === product.category);
-  const related = recommendByCategory(productId, 8);
+  const related = recommendByCategory(products, productId, 8);
   const isFav = wishlist.some((p) => p.id === product.id);
 
   const handleAdd = () => {
@@ -82,11 +84,14 @@ export default function ProductPage() {
           <span className="eyebrow">{product.categoryName}</span>
           <h1 className="mt-2 text-3xl md:text-4xl">{product.name}</h1>
           <div className="mt-3 flex items-center gap-4 text-sm text-muted">
-            <span className="flex items-center gap-1">
-              <Star className="h-4 w-4 fill-amber text-amber" /> <b className="text-ink">{product.rating}</b>
-            </span>
             <span>SKU {product.sku}</span>
-            <span className="flex items-center gap-1 text-brand"><Check className="h-4 w-4" /> In stock</span>
+            {product.stock > 0 ? (
+              <span className="flex items-center gap-1 text-brand">
+                <Check className="h-4 w-4" /> {product.stock < 20 ? `Only ${product.stock} left` : "In stock"}
+              </span>
+            ) : (
+              <span className="font-semibold text-red-600">Out of stock</span>
+            )}
           </div>
 
           <div className="mt-6 font-display text-4xl font-extrabold">{formatPrice(product.price)}</div>
@@ -122,14 +127,14 @@ export default function ProductPage() {
                 <Minus className="h-4 w-4" />
               </button>
               <span className="w-10 text-center font-semibold">{qty}</span>
-              <button onClick={() => setQty((q) => q + 1)} aria-label="Increase quantity" className="grid h-12 w-12 place-items-center hover:text-brand">
+              <button onClick={() => setQty((q) => Math.min(product.stock, q + 1))} aria-label="Increase quantity" className="grid h-12 w-12 place-items-center hover:text-brand">
                 <Plus className="h-4 w-4" />
               </button>
             </div>
-            <button onClick={handleAdd} className="btn-primary flex-1 sm:flex-none">
+            <button onClick={handleAdd} disabled={product.stock <= 0} className="btn-primary flex-1 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
               {added ? <><Check className="h-4 w-4" /> Added</> : <><ShoppingBag className="h-4 w-4" /> Add to cart</>}
             </button>
-            <button onClick={() => { addToCart(product, qty); router.push("/checkout"); }} className="btn-ghost flex-1 sm:flex-none">
+            <button onClick={() => { addToCart(product, qty); router.push("/checkout"); }} disabled={product.stock <= 0} className="btn-ghost flex-1 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
               Buy now
             </button>
           </div>

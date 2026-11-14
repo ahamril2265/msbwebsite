@@ -3,29 +3,40 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { CreditCard, Landmark, Banknote, Lock, CheckCircle2, ArrowLeft } from "lucide-react";
-import { useCart, shippingFor } from "../../context/CartContext";
-import { formatPrice } from "../../lib/product";
+import { Landmark, Banknote, Lock, CheckCircle2, ArrowLeft } from "lucide-react";
+import { useCart } from "../../context/CartContext";
+import { useStore } from "../../context/StoreContext";
+import { formatPrice } from "../../lib/format";
+import { Field, FormError, sendJSON, formValues } from "../../components/Form";
 
 const PAYMENT = [
-  { id: "card", label: "Credit / debit card", icon: CreditCard },
-  { id: "bank", label: "Bank transfer", icon: Landmark, note: "We'll email bank details with your order number." },
+  { id: "bank", label: "Bank transfer", icon: Landmark, note: "We'll email our bank details with your order number. Your order ships once payment arrives." },
   { id: "cod", label: "Cash on delivery", icon: Banknote, note: "Pay the driver when your order arrives." },
 ];
 
 export default function CheckoutPage() {
-  const { items, loaded, subtotal, clearCart } = useCart();
-  const [payment, setPayment] = useState("card");
+  const { items, loaded, subtotal, shipping, clearCart } = useCart();
+  const { user } = useStore();
+  const [payment, setPayment] = useState("bank");
   const [placed, setPlaced] = useState(null);
-
-  const shipping = shippingFor(subtotal);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const total = subtotal + shipping;
 
-  const placeOrder = (e) => {
+  const placeOrder = async (e) => {
     e.preventDefault();
-    // TODO: send to backend / payment provider. For now, confirm locally.
-    setPlaced({ number: "MW" + Date.now().toString().slice(-6), total });
+    setBusy(true);
+    setError("");
+    const { data, error } = await sendJSON("/api/orders", {
+      ...formValues(e.currentTarget),
+      payment,
+      items: items.map((i) => ({ id: i.product.id, qty: i.qty })),
+    });
+    setBusy(false);
+    if (error) return setError(error);
+    setPlaced(data.order);
     clearCart();
+    window.scrollTo(0, 0);
   };
 
   if (!loaded) return <main className="min-h-[60vh]" />;
@@ -34,11 +45,15 @@ export default function CheckoutPage() {
     return (
       <main className="container-x py-24 text-center">
         <CheckCircle2 className="mx-auto h-16 w-16 text-brand" />
-        <h1 className="mt-6 text-3xl">Thank you — order placed</h1>
+        <h1 className="mt-6 text-3xl">Thank you, order placed</h1>
         <p className="mt-2">Order <b className="text-ink">{placed.number}</b> · {formatPrice(placed.total)}</p>
-        <p className="mx-auto mt-1 max-w-sm text-sm">We&apos;ll send a confirmation with delivery details shortly.</p>
+        <p className="mx-auto mt-1 max-w-md text-sm">
+          {placed.payment === "bank"
+            ? `We'll email bank transfer details to ${placed.email}. Please use ${placed.number} as the payment reference.`
+            : "Please have the payment ready when your order arrives."}
+        </p>
         <div className="mt-8 flex justify-center gap-3">
-          <Link href="/orders" className="btn-ghost">View orders</Link>
+          {user ? <Link href={`/orders/${placed.number}`} className="btn-ghost">View order</Link> : <Link href="/signup" className="btn-ghost">Create an account</Link>}
           <Link href="/" className="btn-primary">Back to shop</Link>
         </div>
       </main>
@@ -61,15 +76,20 @@ export default function CheckoutPage() {
         <ArrowLeft className="h-4 w-4" /> Back to cart
       </Link>
       <h1 className="mt-3 text-3xl md:text-4xl">Checkout</h1>
+      {!user && (
+        <p className="mt-2 text-sm">
+          Checking out as a guest. <Link href="/login?next=/checkout" className="font-semibold text-brand hover:underline">Sign in</Link> to save this order to your account.
+        </p>
+      )}
 
       <form onSubmit={placeOrder} className="mt-8 grid gap-8 lg:grid-cols-[1fr_400px]">
         <div className="space-y-6">
           <Section step="1" title="Contact">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Full name" name="name" autoComplete="name" required />
-              <Field label="Phone" name="phone" type="tel" autoComplete="tel" required />
-              <Field label="Email" name="email" type="email" autoComplete="email" className="sm:col-span-2" required />
-              <Field label="Business name (optional)" name="company" autoComplete="organization" className="sm:col-span-2" />
+              <Field label="Full name" name="name" autoComplete="name" defaultValue={user?.name} required />
+              <Field label="Phone" name="phone" type="tel" autoComplete="tel" defaultValue={user?.phone || ""} required />
+              <Field label="Email" name="email" type="email" autoComplete="email" defaultValue={user?.email} className="sm:col-span-2" required />
+              <Field label="Business name (optional)" name="company" autoComplete="organization" defaultValue={user?.company || ""} className="sm:col-span-2" />
             </div>
           </Section>
 
@@ -79,6 +99,7 @@ export default function CheckoutPage() {
               <Field label="City" name="city" autoComplete="address-level2" required />
               <Field label="Postal code" name="postal" autoComplete="postal-code" required />
               <Field label="Country" name="country" autoComplete="country-name" className="sm:col-span-2" required />
+              <Field label="Delivery notes (optional)" name="notes" as="textarea" rows={2} className="sm:col-span-2" />
             </div>
           </Section>
 
@@ -87,32 +108,20 @@ export default function CheckoutPage() {
               {PAYMENT.map(({ id, label, icon: Icon, note }) => (
                 <label
                   key={id}
-                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
-                    payment === id ? "border-brand bg-brandSoft/60" : "border-line hover:border-brand/50"
-                  }`}
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${payment === id ? "border-brand bg-brandSoft/60" : "border-line hover:border-brand/50"}`}
                 >
-                  <input type="radio" name="payment" value={id} checked={payment === id} onChange={() => setPayment(id)} className="mt-1 accent-[#0E6B52]" />
+                  <input type="radio" name="paymentChoice" checked={payment === id} onChange={() => setPayment(id)} className="mt-1 accent-[#0E6B52]" />
                   <Icon className="mt-0.5 h-5 w-5 text-brand" />
                   <span>
                     <span className="block font-semibold">{label}</span>
-                    {note && <span className="block text-xs text-muted">{note}</span>}
+                    <span className="block text-xs text-muted">{note}</span>
                   </span>
                 </label>
               ))}
             </div>
-
-            {payment === "card" && (
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <Field label="Name on card" name="ccname" autoComplete="cc-name" className="sm:col-span-2" />
-                <Field label="Card number" name="ccnumber" autoComplete="cc-number" inputMode="numeric" className="sm:col-span-2" placeholder="1234 5678 9012 3456" />
-                <Field label="Expiry" name="ccexp" autoComplete="cc-exp" placeholder="MM / YY" />
-                <Field label="CVC" name="cccvc" autoComplete="cc-csc" inputMode="numeric" placeholder="123" />
-              </div>
-            )}
           </Section>
         </div>
 
-        {/* Summary */}
         <aside className="h-fit rounded-2xl border border-line bg-surface p-6 lg:sticky lg:top-36">
           <h2 className="text-xl">Your order</h2>
           <ul className="mt-5 max-h-72 space-y-4 overflow-y-auto pr-1">
@@ -140,10 +149,10 @@ export default function CheckoutPage() {
             <span className="font-display text-2xl font-extrabold">{formatPrice(total)}</span>
           </div>
 
-          <button type="submit" className="btn-primary mt-6 w-full">
-            <Lock className="h-4 w-4" /> Place order · {formatPrice(total)}
+          <div className="mt-5"><FormError>{error}</FormError></div>
+          <button type="submit" disabled={busy} className="btn-primary mt-4 w-full disabled:opacity-60">
+            <Lock className="h-4 w-4" /> {busy ? "Placing order…" : `Place order · ${formatPrice(total)}`}
           </button>
-          <p className="mt-3 text-center text-xs">By placing your order you agree to our terms.</p>
         </aside>
       </form>
     </main>
@@ -159,17 +168,5 @@ function Section({ step, title, children }) {
       </h2>
       {children}
     </section>
-  );
-}
-
-function Field({ label, className = "", ...props }) {
-  return (
-    <label className={`block ${className}`}>
-      <span className="mb-1.5 block text-sm font-medium text-ink">{label}</span>
-      <input
-        {...props}
-        className="w-full rounded-xl border border-line bg-page px-4 py-3 text-ink placeholder:text-muted/70 focus:border-brand focus:bg-surface focus:outline-none focus:ring-4 focus:ring-brand/10"
-      />
-    </label>
   );
 }

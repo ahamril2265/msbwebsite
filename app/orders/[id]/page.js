@@ -1,131 +1,55 @@
-"use client";
-
-import { useParams } from "next/navigation";
 import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { db } from "../../../lib/db";
+import { currentUser } from "../../../lib/auth";
+import { formatDate, PAYMENT_LABELS } from "../../../lib/format";
+import { StatusBadge, OrderTracker, OrderItems, OrderTotals } from "../../../components/OrderBits";
 
-export default function OrderDetailsPage() {
-  const params = useParams();
-  const orderId = params.id;
+export const dynamic = "force-dynamic";
 
-  // Static orders (later replace with DB/API fetch)
-  const orders = [
-    {
-      id: "ORD123",
-      date: "2025-09-15",
-      status: "Delivered",
-      total: 199,
-      items: [
-        { name: "Curated Product 1", qty: 1, price: 99 },
-        { name: "Curated Product 2", qty: 1, price: 100 },
-      ],
-    },
-    {
-      id: "ORD124",
-      date: "2025-09-20",
-      status: "Shipped",
-      total: 129,
-      items: [{ name: "Curated Product 3", qty: 2, price: 64.5 }],
-    },
-    {
-      id: "ORD125",
-      date: "2025-09-25",
-      status: "Processing",
-      total: 89,
-      items: [{ name: "Curated Product 4", qty: 1, price: 89 }],
-    },
-  ];
+// The [id] segment is the order number, e.g. /orders/MW1AB2CD34
+export default async function OrderPage({ params }) {
+  const { id } = await params;
+  const user = await currentUser();
+  if (!user) redirect(`/login?next=/orders/${id}`);
 
-  const order = orders.find((o) => o.id === orderId);
-
-  if (!order) {
-    return (
-      <main className="min-h-screen bg-darkBg text-lightText flex items-center justify-center">
-        <h1 className="text-2xl">Order not found</h1>
-      </main>
-    );
-  }
-
-  const steps = ["Processing", "Shipped", "Out for Delivery", "Delivered"];
-  const currentStep = steps.indexOf(order.status);
+  const order = await db.order.findUnique({ where: { number: id }, include: { items: true } });
+  if (!order || (order.userId !== user.id && user.role !== "admin")) notFound();
 
   return (
-    <main className="min-h-screen bg-darkBg text-lightText px-6 py-12">
-      <div className="max-w-4xl mx-auto bg-darkCard p-6 rounded-lg shadow">
-        <h1 className="text-2xl font-bold mb-4">Order #{order.id}</h1>
-        <p className="text-sm text-mutedText mb-6">
-          {order.date} —{" "}
-          <span
-            className={
-              order.status === "Delivered"
-                ? "text-green-400"
-                : order.status === "Shipped"
-                ? "text-blue-400"
-                : "text-yellow-400"
-            }
-          >
-            {order.status}
-          </span>
-        </p>
+    <main className="container-x max-w-4xl py-10">
+      <Link href="/orders" className="inline-flex items-center gap-1 text-sm font-semibold text-muted hover:text-brand">
+        <ArrowLeft className="h-4 w-4" /> All orders
+      </Link>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <h1 className="text-3xl">Order {order.number}</h1>
+        <StatusBadge status={order.status} />
+      </div>
+      <p className="mt-1 text-sm">Placed {formatDate(order.createdAt)}</p>
 
-        {/* Timeline */}
-        <div className="flex justify-between items-center mb-8 relative">
-          {steps.map((step, index) => {
-            const isActive = index <= currentStep;
-            return (
-              <div key={index} className="flex-1 text-center relative">
-                {/* Dot */}
-                <div
-                  className={`w-6 h-6 mx-auto rounded-full ${
-                    isActive ? "bg-accent" : "bg-line"
-                  }`}
-                ></div>
-                <p className="mt-2 text-sm">{step}</p>
+      <section className="mt-8 rounded-2xl border border-line bg-surface p-6">
+        <OrderTracker status={order.status} />
+      </section>
 
-                {/* Connector line */}
-                {index < steps.length - 1 && (
-                  <div
-                    className={`absolute top-3 left-1/2 w-full h-1 -z-10 ${
-                      isActive ? "bg-accent" : "bg-line"
-                    }`}
-                  ></div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      <div className="mt-6 grid gap-6 md:grid-cols-[1fr_300px]">
+        <section className="rounded-2xl border border-line bg-surface p-6">
+          <h2 className="mb-2 text-lg">Items</h2>
+          <OrderItems items={order.items} />
+          <div className="mt-4 border-t border-line pt-4"><OrderTotals order={order} /></div>
+        </section>
 
-        {/* Items */}
-        <div className="space-y-4 mb-6">
-          {order.items.map((item, i) => (
-            <div
-              key={i}
-              className="flex justify-between bg-darkBg p-4 rounded-lg shadow"
-            >
-              <span>
-                {item.name} (x{item.qty})
-              </span>
-              <span>${item.price * item.qty}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Summary */}
-        <div className="flex justify-between text-lg font-bold mb-6">
-          <span>Total</span>
-          <span>${order.total}</span>
-        </div>
-
-        <div className="flex justify-between">
-          <Link
-            href="/orders"
-            className="px-4 py-2 rounded-lg border border-accent text-accent hover:bg-accent hover:text-white transition"
-          >
-            Back to Orders
-          </Link>
-          <button className="px-6 py-2 rounded-lg bg-accent text-white font-semibold hover:bg-accentDark transition">
-            Download Invoice
-          </button>
-        </div>
+        <section className="h-fit space-y-5 rounded-2xl border border-line bg-surface p-6 text-sm">
+          <div>
+            <h2 className="mb-2 text-base">Delivery</h2>
+            <p className="text-ink">{order.name}{order.company && <><br />{order.company}</>}<br />{order.street}<br />{order.city} {order.postal}<br />{order.country}</p>
+          </div>
+          <div>
+            <h2 className="mb-2 text-base">Payment</h2>
+            <p className="text-ink">{PAYMENT_LABELS[order.payment]} · {order.paid ? "Paid" : "Not yet paid"}</p>
+            {order.payment === "bank" && !order.paid && <p className="mt-1 text-xs">Use <b>{order.number}</b> as your transfer reference.</p>}
+          </div>
+        </section>
       </div>
     </main>
   );

@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { X, Heart, ShoppingBag, Package, User, Settings, ChevronRight } from "lucide-react";
-import { categories } from "../lib/product";
+import { useStore } from "../context/StoreContext";
 
 export default function MobileMenu({ open, onClose }) {
+  const { categories, user } = useStore();
   return (
     <>
       {open && <div className="fixed inset-0 z-40 bg-ink/40" onClick={onClose} />}
@@ -41,11 +42,13 @@ export default function MobileMenu({ open, onClose }) {
 
         <nav className="space-y-1 border-t border-line px-5 py-5">
           {[
+            ...(user?.role === "admin" ? [["/admin", "Admin panel", Settings]] : []),
             ["/wishlist", "Wishlist", Heart],
             ["/cart", "Cart", ShoppingBag],
-            ["/orders", "My Orders", Package],
-            ["/profile", "Profile", User],
-            ["/settings", "Settings", Settings],
+            ["/quote", "Bulk quote", Package],
+            ...(user
+              ? [["/orders", "My orders", Package], ["/profile", "Account settings", User]]
+              : [["/login", "Sign in", User], ["/signup", "Create account", User]]),
           ].map(([href, label, Icon]) => (
             <Link key={href} href={href} onClick={onClose} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-ink hover:bg-surface2">
               <Icon className="h-5 w-5 text-muted" /> {label}
