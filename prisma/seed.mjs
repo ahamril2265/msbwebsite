@@ -33,12 +33,15 @@ async function main() {
   const { ADMIN_EMAIL, ADMIN_PASSWORD } = process.env;
   if (ADMIN_EMAIL && ADMIN_PASSWORD) {
     const email = ADMIN_EMAIL.toLowerCase();
+    const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
     const exists = await db.user.findUnique({ where: { email } });
     if (!exists) {
-      await db.user.create({
-        data: { email, name: "Store Admin", role: "admin", passwordHash: await bcrypt.hash(ADMIN_PASSWORD, 10) },
-      });
+      await db.user.create({ data: { email, name: "Store Admin", role: "admin", passwordHash } });
       console.log(`Admin user created: ${email}`);
+    } else {
+      // Keep the admin in sync with .env so changing ADMIN_PASSWORD and re-seeding works.
+      await db.user.update({ where: { email }, data: { passwordHash, role: "admin" } });
+      console.log(`Admin user updated: ${email}`);
     }
   }
 
