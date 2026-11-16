@@ -24,10 +24,10 @@ export async function PATCH(req, { params }) {
     const wasCancelled = order.status === "cancelled";
     const nowCancelled = (data.status ?? order.status) === "cancelled";
     if (wasCancelled !== nowCancelled) {
-      for (const i of order.items) {
+      for (const [productId, n] of stockUnits(order.items)) {
         await tx.product.updateMany({
-          where: { id: i.productId },
-          data: { stock: nowCancelled ? { increment: i.qty } : { decrement: i.qty } },
+          where: { id: productId },
+          data: { stock: nowCancelled ? { increment: n } : { decrement: n } },
         });
       }
     }
@@ -35,4 +35,18 @@ export async function PATCH(req, { params }) {
   });
 
   return NextResponse.json({ order: updated });
+}
+
+// Units of each product an order took from stock, expanding combo lines into their parts.
+function stockUnits(items) {
+  const units = new Map();
+  const add = (id, n) => units.set(id, (units.get(id) || 0) + n);
+  for (const i of items) {
+    if (i.comboId) {
+      for (const part of JSON.parse(i.parts || "[]")) add(part.productId, part.qty * i.qty);
+    } else if (i.productId) {
+      add(i.productId, i.qty);
+    }
+  }
+  return units;
 }

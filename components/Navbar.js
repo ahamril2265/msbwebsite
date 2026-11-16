@@ -31,7 +31,7 @@ export async function logout(setUser, router) {
 export default function Navbar() {
   const [openMobile, setOpenMobile] = useState(false);
   const { count } = useCart();
-  const { categories, settings, user } = useStore();
+  const { categories, combos, settings, user } = useStore();
   const pathname = usePathname();
 
   // The admin area has its own chrome.
@@ -86,6 +86,7 @@ export default function Navbar() {
           {categories.map((c) => (
             <Link key={c.slug} href={`/search?category=${c.slug}`} className="text-muted hover:text-brand">{c.name}</Link>
           ))}
+          {combos.length > 0 && <Link href="/combos" className="font-semibold text-brand hover:underline">Combo offers</Link>}
           <Link href="/quote" className="ml-auto text-brand hover:underline">Bulk orders</Link>
         </div>
       </div>

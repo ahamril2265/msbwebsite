@@ -123,7 +123,7 @@ export default function ProductForm({ product, categories }) {
   );
 }
 
-function Toggle({ name, label, defaultChecked }) {
+export function Toggle({ name, label, defaultChecked }) {
   return (
     <label className="flex cursor-pointer items-center justify-between gap-3 text-sm font-medium">
       {label}

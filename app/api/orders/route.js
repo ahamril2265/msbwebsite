@@ -31,16 +31,40 @@ export async function POST(req) {
   if (!["bank", "cod"].includes(payment)) return jsonError("Choose a payment method.");
   if (!Array.isArray(items) || items.length === 0) return jsonError("Your cart is empty.");
 
-  const ids = items.map((i) => Number(i.id));
-  const products = await db.product.findMany({ where: { id: { in: ids }, active: true } });
+  // Each cart line is either { id, qty } for a product or { comboId, qty } for a combo offer.
+  const productIds = items.filter((i) => !i.comboId).map((i) => Number(i.id));
+  const comboIds = items.filter((i) => i.comboId).map((i) => Number(i.comboId));
+  const combos = comboIds.length
+    ? await db.combo.findMany({ where: { id: { in: comboIds }, active: true }, include: { items: { include: { product: true } } } })
+    : [];
+  const partIds = combos.flatMap((c) => c.items.map((i) => i.productId));
+  const products = await db.product.findMany({ where: { id: { in: [...productIds, ...partIds] }, active: true } });
+  const byId = new Map(products.map((p) => [p.id, p]));
+
   const lines = [];
+  const need = new Map(); // productId -> units needed across the whole order
+  const take = (id, n) => need.set(id, (need.get(id) || 0) + n);
+
   for (const i of items) {
-    const p = products.find((x) => x.id === Number(i.id));
     const qty = Math.floor(Number(i.qty));
-    if (!p) return jsonError("One of the products in your cart is no longer available.", 409);
     if (!(qty > 0)) return jsonError("Invalid quantity.");
-    if (qty > p.stock) return jsonError(`Only ${p.stock} left of ${p.name}.`, 409);
-    lines.push({ productId: p.id, sku: p.sku, name: p.name, img: p.img, price: p.price, qty });
+    if (i.comboId) {
+      const c = combos.find((x) => x.id === Number(i.comboId));
+      if (!c || !c.items.length || c.items.some((ci) => !byId.has(ci.productId)))
+        return jsonError("One of the combo offers in your cart is no longer available.", 409);
+      c.items.forEach((ci) => take(ci.productId, ci.qty * qty));
+      const parts = c.items.map((ci) => ({ productId: ci.productId, sku: ci.product.sku, name: ci.product.name, qty: ci.qty }));
+      lines.push({ comboId: c.id, parts: JSON.stringify(parts), sku: `COMBO-${c.id}`, name: c.name, img: c.img || c.items[0].product.img, price: c.price, qty });
+    } else {
+      const p = byId.get(Number(i.id));
+      if (!p) return jsonError("One of the products in your cart is no longer available.", 409);
+      take(p.id, qty);
+      lines.push({ productId: p.id, sku: p.sku, name: p.name, img: p.img, price: p.price, qty });
+    }
+  }
+  for (const [id, n] of need) {
+    const p = byId.get(id);
+    if (n > p.stock) return jsonError(`Only ${p.stock} left of ${p.name}${partIds.includes(id) ? " (counting the combo offers in your cart)" : ""}.`, 409);
   }
 
   const settings = await getSettings();
@@ -50,8 +74,8 @@ export async function POST(req) {
   const number = "MW" + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 90 + 10);
 
   const order = await db.$transaction(async (tx) => {
-    for (const l of lines) {
-      await tx.product.update({ where: { id: l.productId }, data: { stock: { decrement: l.qty } } });
+    for (const [id, n] of need) {
+      await tx.product.update({ where: { id }, data: { stock: { decrement: n } } });
     }
     return tx.order.create({
       data: {

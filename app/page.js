@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight, Truck, BadgeCheck, Boxes, Recycle } from "lucide-react";
 import Carousel from "../components/Carousel";
+import ComboCard from "../components/ComboCard";
 import { useStore } from "../context/StoreContext";
 import { recommendForUser } from "../lib/recommend";
 import { useRecentlyViewed } from "../context/RecentlyViewedContext";
@@ -12,7 +13,8 @@ import { useRecentlyViewed } from "../context/RecentlyViewedContext";
 const img = (folder, file) => encodeURI(`/Products/${folder}/${file}`);
 
 export default function Home() {
-  const { products, categories } = useStore();
+  const { products, categories, combos } = useStore();
+  const featuredCombos = combos.filter((c) => c.featured).slice(0, 3);
   const byCat = (slug) => products.filter((p) => p.category === slug);
   const { recentlyViewed } = useRecentlyViewed();
   const [userRecs, setUserRecs] = useState([]);
@@ -120,6 +122,24 @@ export default function Home() {
             ))}
           </div>
         </section>
+
+        {/* ─── Combo offers ─── */}
+        {featuredCombos.length > 0 && (
+          <section className="pb-6">
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <span className="eyebrow">Bundle & save</span>
+                <h2 className="mt-2 text-3xl md:text-4xl">Combo offers</h2>
+              </div>
+              <Link href="/combos" className="inline-flex items-center gap-1 text-sm font-semibold text-brand hover:underline">
+                All combos <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {featuredCombos.map((c) => <ComboCard key={c.id} combo={c} />)}
+            </div>
+          </section>
+        )}
 
         {recentlyViewed.length > 0 && <Carousel title="Recently viewed" products={recentlyViewed} />}
 

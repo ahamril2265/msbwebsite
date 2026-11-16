@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { X, Heart, ShoppingBag, Package, User, Settings, ChevronRight } from "lucide-react";
+import { X, Heart, ShoppingBag, Package, User, Settings, ChevronRight, Tag } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 
 export default function MobileMenu({ open, onClose }) {
-  const { categories, user } = useStore();
+  const { categories, combos, user } = useStore();
   return (
     <>
       {open && <div className="fixed inset-0 z-40 bg-ink/40" onClick={onClose} />}
@@ -44,6 +44,7 @@ export default function MobileMenu({ open, onClose }) {
           {[
             ...(user?.role === "admin" ? [["/admin", "Admin panel", Settings]] : []),
             ["/wishlist", "Wishlist", Heart],
+            ...(combos.length ? [["/combos", "Combo offers", Tag]] : []),
             ["/cart", "Cart", ShoppingBag],
             ["/quote", "Bulk quote", Package],
             ...(user

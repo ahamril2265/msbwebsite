@@ -21,12 +21,12 @@ export const metadata = {
 };
 
 export default async function RootLayout({ children }) {
-  const [{ products, categories, settings }, user] = await Promise.all([loadCatalog(), currentUser()]);
+  const [{ products, categories, settings, combos }, user] = await Promise.all([loadCatalog(), currentUser()]);
 
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
       <body className="bg-page text-ink" suppressHydrationWarning>
-        <StoreProvider products={products} categories={categories} settings={settings} user={publicUser(user)}>
+        <StoreProvider products={products} combos={combos} categories={categories} settings={settings} user={publicUser(user)}>
           <CartProvider>
             <WishlistProvider>
               <RecentlyViewedProvider>

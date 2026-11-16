@@ -15,7 +15,7 @@ const PAYMENT = [
 ];
 
 export default function CheckoutPage() {
-  const { items, loaded, subtotal, shipping, clearCart } = useCart();
+  const { items, orderLines, loaded, subtotal, shipping, clearCart } = useCart();
   const { user } = useStore();
   const [payment, setPayment] = useState("bank");
   const [placed, setPlaced] = useState(null);
@@ -30,7 +30,7 @@ export default function CheckoutPage() {
     const { data, error } = await sendJSON("/api/orders", {
       ...formValues(e.currentTarget),
       payment,
-      items: items.map((i) => ({ id: i.product.id, qty: i.qty })),
+      items: orderLines,
     });
     setBusy(false);
     if (error) return setError(error);
@@ -125,17 +125,17 @@ export default function CheckoutPage() {
         <aside className="h-fit rounded-2xl border border-line bg-surface p-6 lg:sticky lg:top-36">
           <h2 className="text-xl">Your order</h2>
           <ul className="mt-5 max-h-72 space-y-4 overflow-y-auto pr-1">
-            {items.map(({ product: p, qty }) => (
-              <li key={p.id} className="flex items-center gap-3">
+            {items.map((it) => (
+              <li key={it.key} className="flex items-center gap-3">
                 <div className="relative h-14 w-14 shrink-0 rounded-lg border border-line bg-white">
-                  <Image src={p.img} alt={p.name} fill sizes="56px" className="object-contain p-1" />
-                  <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-ink px-1 text-[10px] font-bold text-white">{qty}</span>
+                  <Image src={it.img} alt={it.name} fill sizes="56px" className="object-contain p-1" />
+                  <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-ink px-1 text-[10px] font-bold text-white">{it.qty}</span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{p.name}</div>
-                  <div className="text-xs text-muted">SKU {p.sku}</div>
+                  <div className="truncate text-sm font-medium">{it.combo && <span className="mr-1 text-[10px] font-bold text-brand">COMBO</span>}{it.name}</div>
+                  <div className="truncate text-xs text-muted">{it.sub}</div>
                 </div>
-                <span className="text-sm font-semibold">{formatPrice(p.price * qty)}</span>
+                <span className="text-sm font-semibold">{formatPrice(it.price * it.qty)}</span>
               </li>
             ))}
           </ul>

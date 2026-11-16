@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 const StoreContext = createContext(null);
 
 // Catalog, store settings and the signed-in user, loaded on the server in app/layout.js.
-export function StoreProvider({ products, categories, settings, user: initialUser, children }) {
+export function StoreProvider({ products, combos = [], categories, settings, user: initialUser, children }) {
   const [user, setUser] = useState(initialUser);
 
   const refreshUser = useCallback(async () => {
@@ -17,8 +17,11 @@ export function StoreProvider({ products, categories, settings, user: initialUse
 
   const value = useMemo(() => {
     const byId = new Map(products.map((p) => [p.id, p]));
+    const comboById = new Map(combos.map((c) => [c.id, c]));
     return {
       products,
+      combos,
+      getCombo: (id) => comboById.get(Number(id)),
       categories,
       settings,
       user,
@@ -28,7 +31,7 @@ export function StoreProvider({ products, categories, settings, user: initialUse
       getCategory: (slug) => categories.find((c) => c.slug === slug),
       shippingFor: (subtotal) => (subtotal === 0 || subtotal >= settings.freeShippingOver ? 0 : settings.shippingFee),
     };
-  }, [products, categories, settings, user, refreshUser]);
+  }, [products, combos, categories, settings, user, refreshUser]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

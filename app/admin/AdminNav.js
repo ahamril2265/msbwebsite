@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingCart, MessageSquareQuote, Settings, Store, LogOut } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, MessageSquareQuote, Settings, Store, LogOut, Tag } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
 import { logout } from "../../components/Navbar";
 
@@ -10,6 +10,7 @@ const LINKS = [
   ["/admin", "Dashboard", LayoutDashboard],
   ["/admin/orders", "Orders", ShoppingCart],
   ["/admin/products", "Products", Package],
+  ["/admin/combos", "Combo offers", Tag],
   ["/admin/quotes", "Quote requests", MessageSquareQuote],
   ["/admin/settings", "Settings", Settings],
 ];

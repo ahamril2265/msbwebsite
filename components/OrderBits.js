@@ -35,8 +35,16 @@ export function OrderItems({ items }) {
             <Image src={i.img} alt={i.name} fill sizes="56px" className="object-contain p-1" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium">{i.name}</div>
-            <div className="text-xs text-muted">SKU {i.sku} · {i.qty} × {formatPrice(i.price)}</div>
+            <div className="truncate text-sm font-medium">
+              {i.comboId && <span className="mr-1.5 rounded bg-amber/30 px-1.5 py-0.5 text-[10px] font-bold text-ink">COMBO</span>}
+              {i.name}
+            </div>
+            <div className="text-xs text-muted">{i.comboId ? "Combo offer" : `SKU ${i.sku}`} · {i.qty} × {formatPrice(i.price)}</div>
+            {i.comboId && (
+              <div className="mt-0.5 text-xs text-muted">
+                Includes {JSON.parse(i.parts || "[]").map((p) => `${p.qty * i.qty} × ${p.name}`).join(", ")}
+              </div>
+            )}
           </div>
           <span className="text-sm font-semibold">{formatPrice(i.price * i.qty)}</span>
         </li>

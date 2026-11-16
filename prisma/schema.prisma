@@ -48,6 +48,32 @@ model Product {
   category     Category @relation(fields: [categorySlug], references: [slug])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  comboItems   ComboItem[]
+}
+
+// A bundle of products sold together at its own price.
+model Combo {
+  id        Int         @id @default(autoincrement())
+  name      String
+  desc      String      @default("")
+  img       String      @default("") // optional; the store shows the product photos when empty
+  price     Float
+  active    Boolean     @default(true)
+  featured  Boolean     @default(true) // shown on the home page
+  items     ComboItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model ComboItem {
+  id        Int     @id @default(autoincrement())
+  comboId   Int
+  combo     Combo   @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+  qty       Int
+
+  @@unique([comboId, productId])
 }
 
 model Order {
@@ -79,7 +105,9 @@ model OrderItem {
   id        Int    @id @default(autoincrement())
   orderId   Int
   order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId Int
+  productId Int? // set for a single product
+  comboId   Int? // set for a combo offer
+  parts     String? // combos only: JSON [{productId, sku, name, qty}] per one combo, as sold
   sku       String
   name      String
   img       String
